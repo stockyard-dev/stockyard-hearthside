@@ -21,5 +21,26 @@ func now()string{return time.Now().UTC().Format(time.RFC3339)}
 func(d *DB)Create(e *Retro)error{e.ID=genID();e.CreatedAt=now();_,err:=d.db.Exec(`INSERT INTO retros(id,sprint_name,went_well,to_improve,action_items,participants,date,status,created_at)VALUES(?,?,?,?,?,?,?,?,?)`,e.ID,e.SprintName,e.WentWell,e.ToImprove,e.ActionItems,e.Participants,e.Date,e.Status,e.CreatedAt);return err}
 func(d *DB)Get(id string)*Retro{var e Retro;if d.db.QueryRow(`SELECT id,sprint_name,went_well,to_improve,action_items,participants,date,status,created_at FROM retros WHERE id=?`,id).Scan(&e.ID,&e.SprintName,&e.WentWell,&e.ToImprove,&e.ActionItems,&e.Participants,&e.Date,&e.Status,&e.CreatedAt)!=nil{return nil};return &e}
 func(d *DB)List()[]Retro{rows,_:=d.db.Query(`SELECT id,sprint_name,went_well,to_improve,action_items,participants,date,status,created_at FROM retros ORDER BY created_at DESC`);if rows==nil{return nil};defer rows.Close();var o []Retro;for rows.Next(){var e Retro;rows.Scan(&e.ID,&e.SprintName,&e.WentWell,&e.ToImprove,&e.ActionItems,&e.Participants,&e.Date,&e.Status,&e.CreatedAt);o=append(o,e)};return o}
+func(d *DB)Update(e *Retro)error{_,err:=d.db.Exec(`UPDATE retros SET sprint_name=?,went_well=?,to_improve=?,action_items=?,participants=?,date=?,status=? WHERE id=?`,e.SprintName,e.WentWell,e.ToImprove,e.ActionItems,e.Participants,e.Date,e.Status,e.ID);return err}
 func(d *DB)Delete(id string)error{_,err:=d.db.Exec(`DELETE FROM retros WHERE id=?`,id);return err}
 func(d *DB)Count()int{var n int;d.db.QueryRow(`SELECT COUNT(*) FROM retros`).Scan(&n);return n}
+
+func(d *DB)Search(q string, filters map[string]string)[]Retro{
+    where:="1=1"
+    args:=[]any{}
+    if q!=""{
+        where+=" AND (1=0)"
+        
+    }
+    if v,ok:=filters["status"];ok&&v!=""{where+=" AND status=?";args=append(args,v)}
+    rows,_:=d.db.Query(`SELECT id,sprint_name,went_well,to_improve,action_items,participants,date,status,created_at FROM retros WHERE `+where+` ORDER BY created_at DESC`,args...)
+    if rows==nil{return nil};defer rows.Close()
+    var o []Retro;for rows.Next(){var e Retro;rows.Scan(&e.ID,&e.SprintName,&e.WentWell,&e.ToImprove,&e.ActionItems,&e.Participants,&e.Date,&e.Status,&e.CreatedAt);o=append(o,e)};return o
+}
+
+func(d *DB)Stats()map[string]any{
+    m:=map[string]any{"total":d.Count()}
+    rows,_:=d.db.Query(`SELECT status,COUNT(*) FROM retros GROUP BY status`)
+    if rows!=nil{defer rows.Close();by:=map[string]int{};for rows.Next(){var s string;var c int;rows.Scan(&s,&c);by[s]=c};m["by_status"]=by}
+    return m
+}

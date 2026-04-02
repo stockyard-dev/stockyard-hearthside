@@ -1,23 +1,25 @@
 package store
 import ("database/sql";"fmt";"os";"path/filepath";"time";_ "modernc.org/sqlite")
 type DB struct{db *sql.DB}
-type Item struct{
+type Retro struct {
 	ID string `json:"id"`
-	Name string `json:"name"`
-	Description string `json:"description"`
+	SprintName string `json:"sprint_name"`
+	WentWell string `json:"went_well"`
+	ToImprove string `json:"to_improve"`
+	ActionItems string `json:"action_items"`
+	Participants string `json:"participants"`
+	Date string `json:"date"`
 	Status string `json:"status"`
-	Category string `json:"category"`
-	Tags string `json:"tags"`
 	CreatedAt string `json:"created_at"`
 }
 func Open(d string)(*DB,error){if err:=os.MkdirAll(d,0755);err!=nil{return nil,err};db,err:=sql.Open("sqlite",filepath.Join(d,"hearthside.db")+"?_journal_mode=WAL&_busy_timeout=5000");if err!=nil{return nil,err}
-db.Exec(`CREATE TABLE IF NOT EXISTS items(id TEXT PRIMARY KEY,name TEXT NOT NULL,description TEXT DEFAULT '',status TEXT DEFAULT 'active',category TEXT DEFAULT '',tags TEXT DEFAULT '',created_at TEXT DEFAULT(datetime('now')))`)
+db.Exec(`CREATE TABLE IF NOT EXISTS retros(id TEXT PRIMARY KEY,sprint_name TEXT NOT NULL,went_well TEXT DEFAULT '[]',to_improve TEXT DEFAULT '[]',action_items TEXT DEFAULT '[]',participants TEXT DEFAULT '',date TEXT DEFAULT '',status TEXT DEFAULT 'open',created_at TEXT DEFAULT(datetime('now')))`)
 return &DB{db:db},nil}
 func(d *DB)Close()error{return d.db.Close()}
 func genID()string{return fmt.Sprintf("%d",time.Now().UnixNano())}
 func now()string{return time.Now().UTC().Format(time.RFC3339)}
-func(d *DB)Create(e *Item)error{e.ID=genID();e.CreatedAt=now();_,err:=d.db.Exec(`INSERT INTO items(id,name,description,status,category,tags,created_at)VALUES(?,?,?,?,?,?,?)`,e.ID,e.Name,e.Description,e.Status,e.Category,e.Tags,e.CreatedAt);return err}
-func(d *DB)Get(id string)*Item{var e Item;if d.db.QueryRow(`SELECT id,name,description,status,category,tags,created_at FROM items WHERE id=?`,id).Scan(&e.ID,&e.Name,&e.Description,&e.Status,&e.Category,&e.Tags,&e.CreatedAt)!=nil{return nil};return &e}
-func(d *DB)List()[]Item{rows,_:=d.db.Query(`SELECT id,name,description,status,category,tags,created_at FROM items ORDER BY created_at DESC`);if rows==nil{return nil};defer rows.Close();var o []Item;for rows.Next(){var e Item;rows.Scan(&e.ID,&e.Name,&e.Description,&e.Status,&e.Category,&e.Tags,&e.CreatedAt);o=append(o,e)};return o}
-func(d *DB)Delete(id string)error{_,err:=d.db.Exec(`DELETE FROM items WHERE id=?`,id);return err}
-func(d *DB)Count()int{var n int;d.db.QueryRow(`SELECT COUNT(*) FROM items`).Scan(&n);return n}
+func(d *DB)Create(e *Retro)error{e.ID=genID();e.CreatedAt=now();_,err:=d.db.Exec(`INSERT INTO retros(id,sprint_name,went_well,to_improve,action_items,participants,date,status,created_at)VALUES(?,?,?,?,?,?,?,?,?)`,e.ID,e.SprintName,e.WentWell,e.ToImprove,e.ActionItems,e.Participants,e.Date,e.Status,e.CreatedAt);return err}
+func(d *DB)Get(id string)*Retro{var e Retro;if d.db.QueryRow(`SELECT id,sprint_name,went_well,to_improve,action_items,participants,date,status,created_at FROM retros WHERE id=?`,id).Scan(&e.ID,&e.SprintName,&e.WentWell,&e.ToImprove,&e.ActionItems,&e.Participants,&e.Date,&e.Status,&e.CreatedAt)!=nil{return nil};return &e}
+func(d *DB)List()[]Retro{rows,_:=d.db.Query(`SELECT id,sprint_name,went_well,to_improve,action_items,participants,date,status,created_at FROM retros ORDER BY created_at DESC`);if rows==nil{return nil};defer rows.Close();var o []Retro;for rows.Next(){var e Retro;rows.Scan(&e.ID,&e.SprintName,&e.WentWell,&e.ToImprove,&e.ActionItems,&e.Participants,&e.Date,&e.Status,&e.CreatedAt);o=append(o,e)};return o}
+func(d *DB)Delete(id string)error{_,err:=d.db.Exec(`DELETE FROM retros WHERE id=?`,id);return err}
+func(d *DB)Count()int{var n int;d.db.QueryRow(`SELECT COUNT(*) FROM retros`).Scan(&n);return n}

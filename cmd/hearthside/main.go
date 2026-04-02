@@ -1,6 +1,6 @@
 package main
 import ("fmt";"log";"net/http";"os";"github.com/stockyard-dev/stockyard-hearthside/internal/server";"github.com/stockyard-dev/stockyard-hearthside/internal/store")
-func main(){port:=os.Getenv("PORT");if port==""{port="10080"};dataDir:=os.Getenv("DATA_DIR");if dataDir==""{dataDir="./hearthside-data"}
+func main(){port:=os.Getenv("PORT");if port==""{port="9700"};dataDir:=os.Getenv("DATA_DIR");if dataDir==""{dataDir="./hearthside-data"}
 db,err:=store.Open(dataDir);if err!=nil{log.Fatalf("hearthside: %v",err)};defer db.Close();srv:=server.New(db)
-fmt.Printf("\n  Hearthside — sprint retrospective tool\n  Dashboard:  http://localhost:%s/ui\n  API:        http://localhost:%s/api\n\n",port,port)
+fmt.Printf("\n  Hearthside\n  Dashboard:  http://localhost:%s/ui\n  API:        http://localhost:%s/api\n\n",port,port)
 log.Printf("hearthside: listening on :%s",port);log.Fatal(http.ListenAndServe(":"+port,srv))}

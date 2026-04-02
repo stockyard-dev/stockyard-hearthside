@@ -1,15 +1,23 @@
 package store
-import("database/sql";"fmt";"os";"path/filepath";"time";_ "modernc.org/sqlite")
-type DB struct{*sql.DB}
-type Retro struct{ID int64 `json:"id"`;Sprint string `json:"sprint"`;Status string `json:"status"`;CreatedAt time.Time `json:"created_at"`}
-type Item struct{ID int64 `json:"id"`;RetroID int64 `json:"retro_id"`;Category string `json:"category"`;Body string `json:"body"`;Author string `json:"author"`;Votes int `json:"votes"`;CreatedAt time.Time `json:"created_at"`}
-type Action struct{ID int64 `json:"id"`;RetroID int64 `json:"retro_id"`;Description string `json:"description"`;Owner string `json:"owner"`;Status string `json:"status"`;CreatedAt time.Time `json:"created_at"`}
-func Open(d string)(*DB,error){os.MkdirAll(d,0755);dsn:=filepath.Join(d,"hearthside.db")+"?_journal_mode=WAL&_busy_timeout=5000";db,err:=sql.Open("sqlite",dsn);if err!=nil{return nil,fmt.Errorf("open: %w",err)};db.SetMaxOpenConns(1);migrate(db);return &DB{db},nil}
-func migrate(db *sql.DB){db.Exec(`CREATE TABLE IF NOT EXISTS retros(id INTEGER PRIMARY KEY AUTOINCREMENT,sprint TEXT NOT NULL,status TEXT DEFAULT 'open',created_at DATETIME DEFAULT CURRENT_TIMESTAMP);CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY AUTOINCREMENT,retro_id INTEGER NOT NULL,category TEXT DEFAULT 'good',body TEXT NOT NULL,author TEXT DEFAULT '',votes INTEGER DEFAULT 0,created_at DATETIME DEFAULT CURRENT_TIMESTAMP);CREATE TABLE IF NOT EXISTS actions(id INTEGER PRIMARY KEY AUTOINCREMENT,retro_id INTEGER NOT NULL,description TEXT NOT NULL,owner TEXT DEFAULT '',status TEXT DEFAULT 'open',created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`)}
-func(db *DB)CreateRetro(r *Retro)error{res,err:=db.Exec(`INSERT INTO retros(sprint)VALUES(?)`,r.Sprint);if err!=nil{return err};r.ID,_=res.LastInsertId();return nil}
-func(db *DB)ListRetros()([]Retro,error){rows,_:=db.Query(`SELECT id,sprint,status,created_at FROM retros ORDER BY created_at DESC`);defer rows.Close();var out[]Retro;for rows.Next(){var r Retro;rows.Scan(&r.ID,&r.Sprint,&r.Status,&r.CreatedAt);out=append(out,r)};return out,nil}
-func(db *DB)AddItem(i *Item)error{res,err:=db.Exec(`INSERT INTO items(retro_id,category,body,author)VALUES(?,?,?,?)`,i.RetroID,i.Category,i.Body,i.Author);if err!=nil{return err};i.ID,_=res.LastInsertId();return nil}
-func(db *DB)VoteItem(id int64){db.Exec(`UPDATE items SET votes=votes+1 WHERE id=?`,id)}
-func(db *DB)ListItems(retroID int64)([]Item,error){rows,_:=db.Query(`SELECT id,retro_id,category,body,author,votes,created_at FROM items WHERE retro_id=? ORDER BY votes DESC,created_at`,retroID);defer rows.Close();var out[]Item;for rows.Next(){var i Item;rows.Scan(&i.ID,&i.RetroID,&i.Category,&i.Body,&i.Author,&i.Votes,&i.CreatedAt);out=append(out,i)};return out,nil}
-func(db *DB)AddAction(a *Action)error{res,err:=db.Exec(`INSERT INTO actions(retro_id,description,owner)VALUES(?,?,?)`,a.RetroID,a.Description,a.Owner);if err!=nil{return err};a.ID,_=res.LastInsertId();return nil}
-func(db *DB)Stats()(map[string]interface{},error){var retros,actions int;db.QueryRow(`SELECT COUNT(*) FROM retros WHERE status='open'`).Scan(&retros);db.QueryRow(`SELECT COUNT(*) FROM actions WHERE status='open'`).Scan(&actions);return map[string]interface{}{"open_retros":retros,"open_actions":actions},nil}
+import ("database/sql";"fmt";"os";"path/filepath";"time";_ "modernc.org/sqlite")
+type DB struct{db *sql.DB}
+type Item struct{
+	ID string `json:"id"`
+	Name string `json:"name"`
+	Description string `json:"description"`
+	Status string `json:"status"`
+	Category string `json:"category"`
+	Tags string `json:"tags"`
+	CreatedAt string `json:"created_at"`
+}
+func Open(d string)(*DB,error){if err:=os.MkdirAll(d,0755);err!=nil{return nil,err};db,err:=sql.Open("sqlite",filepath.Join(d,"hearthside.db")+"?_journal_mode=WAL&_busy_timeout=5000");if err!=nil{return nil,err}
+db.Exec(`CREATE TABLE IF NOT EXISTS items(id TEXT PRIMARY KEY,name TEXT NOT NULL,description TEXT DEFAULT '',status TEXT DEFAULT 'active',category TEXT DEFAULT '',tags TEXT DEFAULT '',created_at TEXT DEFAULT(datetime('now')))`)
+return &DB{db:db},nil}
+func(d *DB)Close()error{return d.db.Close()}
+func genID()string{return fmt.Sprintf("%d",time.Now().UnixNano())}
+func now()string{return time.Now().UTC().Format(time.RFC3339)}
+func(d *DB)Create(e *Item)error{e.ID=genID();e.CreatedAt=now();_,err:=d.db.Exec(`INSERT INTO items(id,name,description,status,category,tags,created_at)VALUES(?,?,?,?,?,?,?)`,e.ID,e.Name,e.Description,e.Status,e.Category,e.Tags,e.CreatedAt);return err}
+func(d *DB)Get(id string)*Item{var e Item;if d.db.QueryRow(`SELECT id,name,description,status,category,tags,created_at FROM items WHERE id=?`,id).Scan(&e.ID,&e.Name,&e.Description,&e.Status,&e.Category,&e.Tags,&e.CreatedAt)!=nil{return nil};return &e}
+func(d *DB)List()[]Item{rows,_:=d.db.Query(`SELECT id,name,description,status,category,tags,created_at FROM items ORDER BY created_at DESC`);if rows==nil{return nil};defer rows.Close();var o []Item;for rows.Next(){var e Item;rows.Scan(&e.ID,&e.Name,&e.Description,&e.Status,&e.Category,&e.Tags,&e.CreatedAt);o=append(o,e)};return o}
+func(d *DB)Delete(id string)error{_,err:=d.db.Exec(`DELETE FROM items WHERE id=?`,id);return err}
+func(d *DB)Count()int{var n int;d.db.QueryRow(`SELECT COUNT(*) FROM items`).Scan(&n);return n}
